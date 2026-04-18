@@ -1,74 +1,51 @@
-import streamlit as st
-import google.generativeai as genai
-from PIL import Image
+import plotly.graph_objects as go
 
-# ページ設定
-st.set_page_config(page_title="AI採点アプリ", page_icon="📝")
+# 1. 軸の設定（カテゴリ名）
+categories = ['軸1', '軸2', '軸3', '軸4', '軸5', '軸6', '軸7']
 
-# --- サイドバー：設定エリア ---
-st.sidebar.title("⚙️ 設定")
-api_key = st.sidebar.text_input("Google API Keyを入力", type="password")
+# 2. 各データの数値
+# 各リストの最後に最初の値をリピートすることで、チャートを閉じます。
+data_A = [30, 40, 20, 35, 25, 30, 30]
+data_B = [20, 30, 40, 15, 30, 45, 20]
+data_C = [40, 20, 25, 45, 20, 10, 40]
+data_D = [15, 25, 35, 20, 40, 30, 15]
 
-st.sidebar.markdown("""
-**使い方:**
-1. [Google AI Studio](https://aistudio.google.com/)でキーを取得
-2. ここにキーを貼り付け
-3. 解答画像をアップロード
-""")
+fig = go.Figure()
 
-# --- メインエリア：採点機能 ---
-st.title("📝 AI 自動採点システム")
-st.markdown("手書きの解答用紙（画像）をアップロードすると、AIが採点・添削を行います。")
+# 3. データの追加（画像に近い色を設定）
+def add_trace(fig, name, data, color):
+    fig.add_trace(go.Scatterpolar(
+        r=data + [data[0]],  # グラフを閉じるために先頭データを末尾に追加
+        theta=categories + [categories[0]],
+        fill='toself',       # 塗りつぶし設定
+        name=name,
+        line=dict(color=color, width=2),
+        opacity=0.6          # 透過度の設定
+    ))
 
-# APIキーがあるかチェック
-if not api_key:
-    st.warning("👈 左のサイドバーにAPIキーを入力してください")
-    st.stop() # キーがないとここでストップ
+# カラーコードは画像のイメージに合わせて調整
+add_trace(fig, 'A', data_A, '#45B39D') # ティール系
+add_trace(fig, 'B', data_B, '#5DADE2') # ブルー系
+add_trace(fig, 'C', data_C, '#F4B400') # オレンジ系
+add_trace(fig, 'D', data_D, '#AED6F1') # ライトブルー系
 
-# AIのセットアップ
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# 4. レイアウトの調整
+fig.update_layout(
+    polar=dict(
+        radialaxis=dict(
+            visible=True,
+            range=[0, 50], # 軸の最大値
+            gridcolor='lightgray',
+        ),
+        angularaxis=dict(
+            gridcolor='lightgray',
+        ),
+        bgcolor='white'
+    ),
+    showlegend=True,
+    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5), # 凡例を下に配置
+    margin=dict(l=50, r=50, t=50, b=50),
+    paper_bgcolor="white"
+)
 
-# 問題と正解の定義（今回はデモ用に固定。本来はここも入力できるようにします）
-col1, col2 = st.columns(2)
-with col1:
-    question_text = st.text_area("問題文", value="二次方程式 x^2 - 4x + 3 = 0 を解け")
-with col2:
-    correct_text = st.text_area("模範解答", value="(x-1)(x-3)=0 より、x=1, 3")
-
-# ファイルアップロード
-uploaded_file = st.file_uploader("解答画像をアップロード", type=["jpg", "png", "jpeg"])
-
-if uploaded_file is not None:
-    # 画像を表示
-    image = Image.open(uploaded_file)
-    st.image(image, caption="生徒の解答", use_container_width=True)
-
-    # 採点ボタン
-    if st.button("採点開始 🚀"):
-        with st.spinner("AIが思考中...（文字を認識し、論理を検証しています）"):
-            try:
-                # AIへの命令（プロンプト）
-                prompt = f"""
-                あなたはプロの数学講師です。以下の画像を生徒の解答として採点してください。
-                
-                【問題】{question_text}
-                【模範解答】{correct_text}
-                
-                以下のフォーマットで出力してください：
-                ## 採点結果: [点数]/10点
-                ### 判定理由
-                (ここに理由)
-                ### アドバイス
-                (ここにアドバイス)
-                """
-                
-                # 画像とテキストを渡して実行
-                response = model.generate_content([prompt, image])
-                
-                # 結果表示
-                st.success("採点完了！")
-                st.markdown(response.text)
-                
-            except Exception as e:
-                st.error(f"エラーが発生しました: {e}")
+fig.show()
